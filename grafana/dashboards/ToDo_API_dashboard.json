@@ -1,0 +1,17 @@
+{
+  "annotations": {"list": []},
+  "panels": [
+    {
+      "type": "graph",
+      "title": "HTTP requests total",
+      "targets": [{"expr": "http_requests_total"}]
+    },
+    {
+      "type": "graph",
+      "title": "Request duration (histogram)",
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))"}]
+    }
+  ],
+  "schemaVersion": 22,
+  "title": "ToDo API - Metrics"
+}

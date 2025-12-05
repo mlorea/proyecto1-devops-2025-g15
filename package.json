@@ -1,0 +1,28 @@
+{
+  "name": "proyecto1-todo-api",
+  "version": "1.0.0",
+  "description": "To-Do API para Proyecto 1 - CI/CD, Terraform, Docker, Monitoring, Seguridad (SQLite version)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "test": "jest --runInBand",
+    "lint": "eslint . --ext .js",
+    "sbom": "npx @cyclonedx/bom --output sbom.json --format json"
+  },
+  "author": "EquipoX",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "body-parser": "^1.20.2",
+    "better-sqlite3": "^8.0.1",
+    "nanoid": "^4.0.0",
+    "prom-client": "^14.0.1"
+  },
+  "devDependencies": {
+    "jest": "^29.6.1",
+    "supertest": "7.1.4",
+    "eslint": "^8.57.1",
+    "nodemon": "^2.0.22"
+  }
+}
