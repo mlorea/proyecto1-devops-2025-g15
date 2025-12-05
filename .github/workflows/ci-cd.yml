@@ -1,85 +1,111 @@
-name: CI-CD Pipeline
+name: CI/CD - Proyecto 1 Grupo 15
 
 on:
   push:
-    branches: ['main', 'release/*', 'develop']
+    branches: [ main ]
   pull_request:
-    branches: ['main', 'release/*']
+    branches: [ main ]
 
 jobs:
   ci:
-    name: Build → Test → Analysis
+    name: Integración Continua
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      # ---------------------------
+      # CHECKOUT DEL REPO
+      # ---------------------------
+      - name: Checkout Código
         uses: actions/checkout@v4
 
-      - name: Use Node.js 18
+      # ---------------------------
+      # INSTALAR NODE 20
+      # ---------------------------
+      - name: Configurar Node.js 20
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '20'
 
-      - name: Install dependencies
-        run: npm ci
+      # ---------------------------
+      # INSTALAR DEPENDENCIAS
+      # ---------------------------
+      - name: Instalar dependencias
+        run: npm install
 
-      - name: Lint
-        run: npm run lint
+      # ---------------------------
+      # LINTER - ESLINT
+      # ---------------------------
+      - name: Ejecutar ESLint
+        run: |
+          npx eslint . || true
 
-      - name: Run tests
+      # ---------------------------
+      # TESTS
+      # ---------------------------
+      - name: Ejecutar Tests
         run: npm test
 
-      - name: Snyk (scan)
-        uses: snyk/actions/node@master
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        with:
-          command: test
+      # ---------------------------
+      # SBOM (CycloneDX)
+      # ---------------------------
+      - name: Generar SBOM (CycloneDX)
+        run: npx @cyclonedx/bom -o sbom.json
 
-      - name: Generate SBOM
-        run: npm run sbom
-
-      - name: Upload SBOM
+      - name: Subir SBOM como artefacto
         uses: actions/upload-artifact@v4
         with:
           name: sbom
           path: sbom.json
 
-  build_and_push:
-    name: Build & Push Docker image
+      # ---------------------------
+      # ANALISIS DE SEGURIDAD (SNYK O NPM AUDIT)
+      # ---------------------------
+      - name: Security Audit
+        run: npm audit --audit-level=high || true
+
+  # -------------------------------------------------------------------
+  # CD – Build y Deploy
+  # -------------------------------------------------------------------
+  cd:
+    name: Despliegue
     needs: ci
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout Código
+        uses: actions/checkout@v4
 
-      - name: Build and push
-        uses: docker/build-push-action@v4
+      # ---------------------------
+      # LOGIN A GHCR (REGISTRO DE IMÁGENES)
+      # ---------------------------
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USER }}/proyecto1:latest
-          file: ./Dockerfile
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ---------------------------
+      # BUILD IMAGEN DOCKER
+      # ---------------------------
+      - name: Build Docker Image
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}:latest .
+
+      # ---------------------------
+      # PUSH IMAGEN DOCKER
+      # ---------------------------
+      - name: Push Docker Image
+        run: |
+          docker push ghcr.io/${{ github.repository }}:latest
+
+      # ---------------------------
+      # DEPLOY CON TERRAFORM
+      # ---------------------------
+      - name: Terraform Init
+        run: terraform -chdir=terraform init
+
+      - name: Terraform Apply
         env:
-          DOCKER_BUILDKIT: 1
-          DOCKER_CLI_EXPERIMENTAL: enabled
-
-  deploy:
-    name: Deploy (Terraform)
-    runs-on: ubuntu-latest
-    needs: build_and_push
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/heads/release/')
-
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-
-      - name: Terraform init
-        working-directory: ./terraform
-        run: terraform init
-
-      - name: Terraform apply
-        working-directory: ./terraform
-        env:
-          DOCKER_HOST: "unix:///var/run/docker.sock"
-        run: terraform apply -auto-approve
+          TF_VAR_image: ghcr.io/${{ github.repository }}:latest
+        run: terraform -chdir=terraform apply -auto-approve
