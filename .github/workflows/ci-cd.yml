@@ -103,7 +103,15 @@ jobs:
       - name: Push Docker Image
         run: |
           docker push ghcr.io/${{ github.repository }}:latest
-
+          
+      # ---------------------------
+      # INSTALAR TERRAFORM
+      # ---------------------------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.5    
+          
       # ---------------------------
       # DEPLOY CON TERRAFORM
       # ---------------------------
