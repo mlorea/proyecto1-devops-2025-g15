@@ -30,4 +30,6 @@ jobs:
       - name: Terraform Destroy
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_image: "dummy"   # valor de relleno, solo para que no pida input
         run: terraform -chdir=terraform destroy -auto-approve
+
