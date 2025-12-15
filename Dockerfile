@@ -1,20 +1,48 @@
-# Imagen base de Node
-FROM node:20-alpine
+# Build stage
+FROM node:18-alpine AS builder
 
-# Directorio de trabajo dentro del contenedor
-WORKDIR /usr/src/app
+WORKDIR /app
 
-# Copiar definición de dependencias
+# Copy package files
 COPY package*.json ./
 
-# Instalar dependencias de producción
-RUN npm install --omit=dev
+# Install dependencies
+RUN npm install --only=production && npm cache clean --force
 
-# Copiar el resto del código de la app
-COPY . .
+# Production stage
+FROM node:18-alpine
 
-# Exponer el puerto donde escucha la API
+WORKDIR /app
+
+# Install dumb-init for proper signal handling
+RUN apk add --no-cache dumb-init
+
+# Create a non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S nodejs -u 1001
+
+# Copy dependencies from builder
+COPY --from=builder /app/node_modules ./node_modules
+
+# Copy application code
+COPY --chown=nodejs:nodejs src ./src
+COPY --chown=nodejs:nodejs package*.json ./
+
+# Create data directory with proper permissions
+RUN mkdir -p /app/data && chown -R nodejs:nodejs /app/data
+
+# Switch to non-root user
+USER nodejs
+
+# Expose port
 EXPOSE 3000
 
-# Comando de arranque de la API
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
 CMD ["node", "src/index.js"]
