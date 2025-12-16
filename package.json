@@ -7,8 +7,15 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "test": "jest --runInBand",
+    "test:coverage": "jest --runInBand --coverage",
     "lint": "eslint . --ext .js",
-    "sbom": "npx @cyclonedx/cyclonedx-npm --output-file sbom.json"
+    "sbom": "npx @cyclonedx/cyclonedx-npm --output-file sbom.json",
+    "security:pipeline": "pwsh -File security-pipeline.ps1",
+    "security:install": "pwsh -File install-security-tools.ps1",
+    "security:report": "pwsh -File interpret-security-reports.ps1",
+    "docker:build": "docker build -t proyecto1-todo-api:latest .",
+    "docker:scan": "trivy image proyecto1-todo-api:latest",
+    "sonar": "sonar-scanner"
   },
   "author": "Grupo 15",
   "license": "MIT",

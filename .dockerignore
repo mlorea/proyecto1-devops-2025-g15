@@ -1,0 +1,63 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+
+# Testing
+coverage/
+.nyc_output/
+*.test.js
+tests/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+README.md
+MONITORING.md
+*.md
+
+# Terraform
+terraform/
+*.tf
+*.tfstate
+*.tfstate.backup
+.terraform/
+
+# Monitoring configs (already mounted as volumes)
+prometheus/
+grafana/
+
+# Build artifacts
+dist/
+build/
+sbom.json
