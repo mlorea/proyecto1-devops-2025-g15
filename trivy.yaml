@@ -1,0 +1,27 @@
+# Configuración de Trivy para escaneo de seguridad
+# Trivy escanea vulnerabilidades en imágenes de contenedores, filesystem y más
+
+# Severidad mínima a reportar
+severity:
+  - UNKNOWN
+  - LOW
+  - MEDIUM
+  - HIGH
+  - CRITICAL
+
+# Tipos de vulnerabilidades a detectar
+vuln-type:
+  - os        # Vulnerabilidades del sistema operativo
+  - library   # Vulnerabilidades en librerías/dependencias
+
+# Formato de salida
+format: table
+
+# Timeout para el escaneo
+timeout: 15m
+
+# Actualizar base de datos de vulnerabilidades
+skip-db-update: false
+
+# Ignorar vulnerabilidades sin fix disponible (desactivado por defecto)
+ignore-unfixed: false

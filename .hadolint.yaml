@@ -1,0 +1,19 @@
+# Configuración de Hadolint para validación de Dockerfile
+# Hadolint es un linter que valida mejores prácticas en Dockerfiles
+
+# Ignorar algunas reglas específicas si es necesario
+ignored:
+  # DL3018: Pin versions in apk add
+  # - DL3018
+  
+# Reglas de confianza
+trustedRegistries:
+  - docker.io
+  - gcr.io
+  - ghcr.io
+
+# Nivel de severidad mínimo para reportar (error, warning, info, style)
+failure-threshold: warning
+
+# Formato de salida: tty, json, checkstyle, codeclimate, gitlab_codeclimate, gnu, codacy
+# tty es el formato legible para humanos

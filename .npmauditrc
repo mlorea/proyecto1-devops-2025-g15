@@ -1,0 +1,16 @@
+# Configuración de npm audit para control de dependencias
+# npm audit analiza las dependencias en busca de vulnerabilidades conocidas
+
+# Nivel de severidad que causará que npm audit falle
+# Opciones: low, moderate, high, critical, none
+audit-level=moderate
+
+# Formato de salida del reporte
+# Opciones: json, text
+# json es útil para procesamiento automático, text para lectura humana
+
+# Omitir dependencias de desarrollo en el audit (opcional)
+# omit=dev
+
+# Archivo de configuración adicional
+# Puedes crear .npmrc en tu proyecto para configuraciones específicas

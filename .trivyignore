@@ -1,0 +1,6 @@
+# Archivo para ignorar vulnerabilidades específicas en Trivy
+# Formato: CVE-ID + motivo (opcional)
+# Ejemplo:
+# CVE-2023-12345 # Se ignora porque ya tiene mitigación en nuestra infraestructura
+
+# Agregar aquí CVEs que necesites ignorar temporalmente
