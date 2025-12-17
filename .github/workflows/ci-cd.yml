@@ -6,49 +6,31 @@ permissions:
 
 on:
   workflow_dispatch:
- 
+
 jobs:
   ci:
     name: Integración Continua
     runs-on: ubuntu-latest
 
     steps:
-      # ---------------------------
-      # CHECKOUT DEL REPO
-      # ---------------------------
       - name: Checkout Código
         uses: actions/checkout@v4
 
-      # ---------------------------
-      # INSTALAR NODE 20
-      # ---------------------------
       - name: Configurar Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # ---------------------------
-      # INSTALAR DEPENDENCIAS
-      # ---------------------------
-      - name: Instalar dependencias
+      - name: Instalar dependencias (API)
         run: npm install
 
-      # ---------------------------
-      # LINTER - ESLINT
-      # ---------------------------
       - name: Ejecutar ESLint
         run: |
           npx eslint . || true
 
-      # ---------------------------
-      # TESTS
-      # ---------------------------
       - name: Ejecutar Tests
         run: npm test
 
-      # ---------------------------
-      # SBOM (CycloneDX)
-      # ---------------------------
       - name: Generar SBOM (CycloneDX)
         run: npx @cyclonedx/cyclonedx-npm --output-file sbom.json
 
@@ -58,15 +40,9 @@ jobs:
           name: sbom
           path: sbom.json
 
-      # ---------------------------
-      # ANALISIS DE SEGURIDAD (SNYK O NPM AUDIT)
-      # ---------------------------
       - name: Security Audit
         run: npm audit --audit-level=high || true
 
-  # -------------------------------------------------------------------
-  # CD – Build y Deploy en AWS (ECR + ECS/Fargate via Terraform)
-  # -------------------------------------------------------------------
   cd:
     name: Despliegue
     needs: ci
@@ -87,49 +63,94 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       # ---------------------------
-      # VARIABLES DE IMAGEN / ECR
+      # VARIABLES GENERALES
       # ---------------------------
-      - name: Set image variables
-        id: vars
+      - name: Set variables
         run: |
-          echo "REPOSITORY=proyecto1-todo-api" >> $GITHUB_OUTPUT
-          echo "IMAGE_TAG=latest" >> $GITHUB_OUTPUT
+          echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
+          echo "AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}" >> $GITHUB_ENV
+          echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+          echo "ECR_BASE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
+
+          # Nombres de repos ECR (uno por imagen)
+          echo "ECR_REPO_APP=proyecto1-todo-api" >> $GITHUB_ENV
+          echo "ECR_REPO_PROM=proyecto1-prometheus" >> $GITHUB_ENV
+          echo "ECR_REPO_AM=proyecto1-alertmanager" >> $GITHUB_ENV
+          echo "ECR_REPO_GRAF=proyecto1-grafana" >> $GITHUB_ENV
+          echo "ECR_REPO_FE=proyecto1-frontend" >> $GITHUB_ENV
 
       # ---------------------------
       # LOGIN A ECR
       # ---------------------------
       - name: Log in to Amazon ECR
         run: |
-          aws ecr get-login-password --region ${{ secrets.AWS_REGION }} \
-            | docker login \
-              --username AWS \
-              --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+          aws ecr get-login-password --region "$AWS_REGION" \
+            | docker login --username AWS --password-stdin "$ECR_BASE"
 
       # ---------------------------
-      # CREAR REPO ECR SI NO EXISTE
+      # CREAR REPOS ECR SI NO EXISTEN
       # ---------------------------
-      - name: Create ECR repo if not exists
+      - name: Create ECR repos if not exist
         run: |
-          aws ecr describe-repositories \
-            --repository-names ${{ steps.vars.outputs.REPOSITORY }} \
-            || aws ecr create-repository --repository-name ${{ steps.vars.outputs.REPOSITORY }}
+          for repo in "$ECR_REPO_APP" "$ECR_REPO_PROM" "$ECR_REPO_AM" "$ECR_REPO_GRAF" "$ECR_REPO_FE"; do
+            aws ecr describe-repositories --repository-names "$repo" >/dev/null 2>&1 \
+              || aws ecr create-repository --repository-name "$repo" >/dev/null
+          done
 
       # ---------------------------
-      # BUILD IMAGEN DOCKER
+      # BUILD + PUSH (APP)
       # ---------------------------
-      - name: Build Docker Image
+      - name: Build & Push APP
         run: |
-          docker build -t ${{ steps.vars.outputs.REPOSITORY }}:latest .
+          APP_URI="$ECR_BASE/$ECR_REPO_APP"
+          docker build -t "$ECR_REPO_APP:$IMAGE_TAG" .
+          docker tag "$ECR_REPO_APP:$IMAGE_TAG" "$APP_URI:$IMAGE_TAG"
+          docker push "$APP_URI:$IMAGE_TAG"
+          echo "TF_VAR_image=$APP_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
       # ---------------------------
-      # TAG + PUSH A ECR
+      # BUILD + PUSH (PROMETHEUS)
       # ---------------------------
-      - name: Tag and Push Image to ECR
+      - name: Build & Push Prometheus
         run: |
-          ECR_URI=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/${{ steps.vars.outputs.REPOSITORY }}
-          docker tag ${{ steps.vars.outputs.REPOSITORY }}:latest $ECR_URI:${{ steps.vars.outputs.IMAGE_TAG }}
-          docker push $ECR_URI:${{ steps.vars.outputs.IMAGE_TAG }}
-          echo "IMAGE_URI=$ECR_URI:${{ steps.vars.outputs.IMAGE_TAG }}" >> $GITHUB_ENV
+          PROM_URI="$ECR_BASE/$ECR_REPO_PROM"
+          docker build -f monitoring/prometheus/Dockerfile -t "$ECR_REPO_PROM:$IMAGE_TAG" monitoring/prometheus
+          docker tag "$ECR_REPO_PROM:$IMAGE_TAG" "$PROM_URI:$IMAGE_TAG"
+          docker push "$PROM_URI:$IMAGE_TAG"
+          echo "TF_VAR_prometheus_image=$PROM_URI:$IMAGE_TAG" >> $GITHUB_ENV
+
+      # ---------------------------
+      # BUILD + PUSH (ALERTMANAGER)
+      # ---------------------------
+      - name: Build & Push Alertmanager
+        run: |
+          AM_URI="$ECR_BASE/$ECR_REPO_AM"
+          docker build -f monitoring/alertmanager/Dockerfile -t "$ECR_REPO_AM:$IMAGE_TAG" monitoring/alertmanager
+          docker tag "$ECR_REPO_AM:$IMAGE_TAG" "$AM_URI:$IMAGE_TAG"
+          docker push "$AM_URI:$IMAGE_TAG"
+          echo "TF_VAR_alertmanager_image=$AM_URI:$IMAGE_TAG" >> $GITHUB_ENV
+
+      # ---------------------------
+      # BUILD + PUSH (GRAFANA)
+      # ---------------------------
+      - name: Build & Push Grafana
+        run: |
+          GRAF_URI="$ECR_BASE/$ECR_REPO_GRAF"
+          docker build -f monitoring/grafana/Dockerfile -t "$ECR_REPO_GRAF:$IMAGE_TAG" monitoring/grafana
+          docker tag "$ECR_REPO_GRAF:$IMAGE_TAG" "$GRAF_URI:$IMAGE_TAG"
+          docker push "$GRAF_URI:$IMAGE_TAG"
+          echo "TF_VAR_grafana_image=$GRAF_URI:$IMAGE_TAG" >> $GITHUB_ENV
+
+      # ---------------------------
+      # BUILD + PUSH (FRONTEND)
+      # ---------------------------
+      - name: Build & Push Frontend
+        run: |
+          FE_URI="$ECR_BASE/$ECR_REPO_FE"
+          docker build -f frontend/Dockerfile -t "$ECR_REPO_FE:$IMAGE_TAG" frontend
+          docker tag "$ECR_REPO_FE:$IMAGE_TAG" "$FE_URI:$IMAGE_TAG"
+          docker push "$FE_URI:$IMAGE_TAG"
+          echo "TF_VAR_frontend_image=$FE_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
       # ---------------------------
       # INSTALAR TERRAFORM
@@ -140,7 +161,7 @@ jobs:
           terraform_version: 1.8.5
 
       # ---------------------------
-      # DEPLOY CON TERRAFORM EN AWS
+      # TERRAFORM INIT/APPLY
       # ---------------------------
       - name: Terraform Init
         env:
@@ -149,7 +170,12 @@ jobs:
 
       - name: Terraform Apply
         env:
-          TF_VAR_image: ${{ env.IMAGE_URI }}
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_image: ${{ env.TF_VAR_image }}
+          TF_VAR_prometheus_image: ${{ env.TF_VAR_prometheus_image }}
+          TF_VAR_alertmanager_image: ${{ env.TF_VAR_alertmanager_image }}
+          TF_VAR_grafana_image: ${{ env.TF_VAR_grafana_image }}
+          TF_VAR_frontend_image: ${{ env.TF_VAR_frontend_image }}
+          # opcional: si querés limitar acceso a UIs
+          # TF_VAR_ui_allowed_cidr: ${{ secrets.UI_ALLOWED_CIDR }}
         run: terraform -chdir=terraform apply -auto-approve
-  
