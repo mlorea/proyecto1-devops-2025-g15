@@ -20,7 +20,7 @@ provider "aws" {
 }
 
 variable "image" {
-  description = "URI completa de la imagen Docker en ECR"
+  description = "URI completa de la imagen Docker en ECR (app todo)"
   type        = string
 }
 
@@ -111,6 +111,7 @@ resource "aws_ecs_task_definition" "todo" {
   ])
 }
 
+# IMPORTANTE: se registra en Cloud Map (definido en monitoring.tf)
 resource "aws_ecs_service" "todo" {
   name            = "proyecto1-todo-service"
   cluster         = aws_ecs_cluster.this.id
@@ -118,9 +119,14 @@ resource "aws_ecs_service" "todo" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
+  # Registro DNS interno: todo.internal
+  service_registries {
+    registry_arn = aws_service_discovery_service.todo.arn
+  }
+
   network_configuration {
-    subnets         = data.aws_subnets.default.ids
-    security_groups = [aws_security_group.todo_sg.id]
+    subnets          = data.aws_subnets.default.ids
+    security_groups  = [aws_security_group.todo_sg.id]
     assign_public_ip = true
   }
 }
