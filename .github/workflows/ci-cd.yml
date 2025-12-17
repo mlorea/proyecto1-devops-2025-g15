@@ -109,34 +109,34 @@ jobs:
           echo "TF_VAR_image=$APP_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
       # ---------------------------
-      # BUILD + PUSH (PROMETHEUS)
+      # BUILD + PUSH (PROMETHEUS)  
       # ---------------------------
       - name: Build & Push Prometheus
         run: |
           PROM_URI="$ECR_BASE/$ECR_REPO_PROM"
-          docker build -f monitoring/prometheus/Dockerfile -t "$ECR_REPO_PROM:$IMAGE_TAG" monitoring/prometheus
+          docker build -f prometheus/Dockerfile -t "$ECR_REPO_PROM:$IMAGE_TAG" prometheus
           docker tag "$ECR_REPO_PROM:$IMAGE_TAG" "$PROM_URI:$IMAGE_TAG"
           docker push "$PROM_URI:$IMAGE_TAG"
           echo "TF_VAR_prometheus_image=$PROM_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
       # ---------------------------
-      # BUILD + PUSH (ALERTMANAGER)
+      # BUILD + PUSH (ALERTMANAGER) 
       # ---------------------------
       - name: Build & Push Alertmanager
         run: |
           AM_URI="$ECR_BASE/$ECR_REPO_AM"
-          docker build -f monitoring/alertmanager/Dockerfile -t "$ECR_REPO_AM:$IMAGE_TAG" monitoring/alertmanager
+          docker build -f alertmanager/Dockerfile -t "$ECR_REPO_AM:$IMAGE_TAG" alertmanager
           docker tag "$ECR_REPO_AM:$IMAGE_TAG" "$AM_URI:$IMAGE_TAG"
           docker push "$AM_URI:$IMAGE_TAG"
           echo "TF_VAR_alertmanager_image=$AM_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
       # ---------------------------
-      # BUILD + PUSH (GRAFANA)
+      # BUILD + PUSH (GRAFANA) 
       # ---------------------------
       - name: Build & Push Grafana
         run: |
           GRAF_URI="$ECR_BASE/$ECR_REPO_GRAF"
-          docker build -f monitoring/grafana/Dockerfile -t "$ECR_REPO_GRAF:$IMAGE_TAG" monitoring/grafana
+          docker build -f grafana/Dockerfile -t "$ECR_REPO_GRAF:$IMAGE_TAG" grafana
           docker tag "$ECR_REPO_GRAF:$IMAGE_TAG" "$GRAF_URI:$IMAGE_TAG"
           docker push "$GRAF_URI:$IMAGE_TAG"
           echo "TF_VAR_grafana_image=$GRAF_URI:$IMAGE_TAG" >> $GITHUB_ENV
