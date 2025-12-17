@@ -43,6 +43,16 @@ jobs:
       - name: Security Audit
         run: npm audit --audit-level=high || true
 
+      # ---------------------------
+      # SONARQUBE (SOLO SI EXISTEN SECRETS)
+      # ---------------------------
+      - name: SonarQube Scan
+        if: ${{ secrets.SONAR_TOKEN != '' }}
+        uses: sonarsource/sonarqube-scan-action@master
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+
   cd:
     name: Despliegue
     needs: ci
@@ -109,7 +119,7 @@ jobs:
           echo "TF_VAR_image=$APP_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
       # ---------------------------
-      # BUILD + PUSH (PROMETHEUS)  
+      # BUILD + PUSH (PROMETHEUS)
       # ---------------------------
       - name: Build & Push Prometheus
         run: |
@@ -120,7 +130,7 @@ jobs:
           echo "TF_VAR_prometheus_image=$PROM_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
       # ---------------------------
-      # BUILD + PUSH (ALERTMANAGER) 
+      # BUILD + PUSH (ALERTMANAGER)
       # ---------------------------
       - name: Build & Push Alertmanager
         run: |
@@ -131,7 +141,7 @@ jobs:
           echo "TF_VAR_alertmanager_image=$AM_URI:$IMAGE_TAG" >> $GITHUB_ENV
 
       # ---------------------------
-      # BUILD + PUSH (GRAFANA) 
+      # BUILD + PUSH (GRAFANA)
       # ---------------------------
       - name: Build & Push Grafana
         run: |
@@ -176,6 +186,4 @@ jobs:
           TF_VAR_alertmanager_image: ${{ env.TF_VAR_alertmanager_image }}
           TF_VAR_grafana_image: ${{ env.TF_VAR_grafana_image }}
           TF_VAR_frontend_image: ${{ env.TF_VAR_frontend_image }}
-          # opcional: si querés limitar acceso a UIs
-          # TF_VAR_ui_allowed_cidr: ${{ secrets.UI_ALLOWED_CIDR }}
         run: terraform -chdir=terraform apply -auto-approve
