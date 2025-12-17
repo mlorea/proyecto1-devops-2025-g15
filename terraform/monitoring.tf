@@ -191,4 +191,167 @@ resource "aws_ecs_task_definition" "prometheus" {
   memory                   = "512"
   execution_role_arn       = aws_iam_role.task_execution.arn
 
-  container_definitions_
+  container_definitions = jsonencode([
+    {
+      name      = "prometheus"
+      image     = var.prometheus_image
+      essential = true
+      portMappings = [
+        {
+          containerPort = 9090
+          protocol      = "tcp"
+        }
+      ]
+    }
+  ])
+}
+
+resource "aws_ecs_task_definition" "alertmanager" {
+  family                   = "proyecto1-alertmanager"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.task_execution.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "alertmanager"
+      image     = var.alertmanager_image
+      essential = true
+      portMappings = [
+        {
+          containerPort = 9093
+          protocol      = "tcp"
+        }
+      ]
+    }
+  ])
+}
+
+resource "aws_ecs_task_definition" "grafana" {
+  family                   = "proyecto1-grafana"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.task_execution.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "grafana"
+      image     = var.grafana_image
+      essential = true
+      portMappings = [
+        {
+          containerPort = 3000
+          protocol      = "tcp"
+        }
+      ]
+    }
+  ])
+}
+
+resource "aws_ecs_task_definition" "frontend" {
+  family                   = "proyecto1-frontend"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = "256"
+  memory                   = "512"
+  execution_role_arn       = aws_iam_role.task_execution.arn
+
+  container_definitions = jsonencode([
+    {
+      name      = "frontend"
+      image     = var.frontend_image
+      essential = true
+      portMappings = [
+        {
+          containerPort = 80
+          protocol      = "tcp"
+        }
+      ]
+    }
+  ])
+}
+
+############################################
+# ECS SERVICES (con IP pública)
+############################################
+
+resource "aws_ecs_service" "prometheus" {
+  name            = "proyecto1-prometheus"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.prometheus.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.prometheus.arn
+  }
+
+  network_configuration {
+    subnets          = data.aws_subnets.default.ids
+    security_groups  = [aws_security_group.prometheus_sg.id]
+    assign_public_ip = true
+  }
+}
+
+resource "aws_ecs_service" "alertmanager" {
+  name            = "proyecto1-alertmanager"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.alertmanager.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  service_registries {
+    registry_arn = aws_service_discovery_service.alertmanager.arn
+  }
+
+  network_configuration {
+    subnets          = data.aws_subnets.default.ids
+    security_groups  = [aws_security_group.alertmanager_sg.id]
+    assign_public_ip = true
+  }
+}
+
+resource "aws_ecs_service" "grafana" {
+  name            = "proyecto1-grafana"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.grafana.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = data.aws_subnets.default.ids
+    security_groups  = [aws_security_group.grafana_sg.id]
+    assign_public_ip = true
+  }
+}
+
+resource "aws_ecs_service" "frontend" {
+  name            = "proyecto1-frontend"
+  cluster         = aws_ecs_cluster.this.id
+  task_definition = aws_ecs_task_definition.frontend.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets          = data.aws_subnets.default.ids
+    security_groups  = [aws_security_group.frontend_sg.id]
+    assign_public_ip = true
+  }
+}
+
+############################################
+# OUTPUTS
+############################################
+
+output "monitoring_service_names" {
+  value = {
+    prometheus   = aws_ecs_service.prometheus.name
+    alertmanager = aws_ecs_service.alertmanager.name
+    grafana      = aws_ecs_service.grafana.name
+    frontend     = aws_ecs_service.frontend.name
+  }
+}
