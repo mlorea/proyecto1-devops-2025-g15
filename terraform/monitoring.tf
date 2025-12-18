@@ -155,6 +155,43 @@ resource "aws_security_group" "grafana_sg" {
 }
 
 ############################################
+# REGLAS INTERNAS (SG -> SG)
+# - Grafana -> Prometheus (queries)
+# - Prometheus -> Alertmanager (envío alertas)
+# - Prometheus -> Todo API (scrape /metrics)
+############################################
+
+resource "aws_security_group_rule" "prometheus_allow_grafana_9090" {
+  type                     = "ingress"
+  description              = "Allow Grafana to query Prometheus"
+  security_group_id        = aws_security_group.prometheus_sg.id
+  source_security_group_id = aws_security_group.grafana_sg.id
+  from_port                = 9090
+  to_port                  = 9090
+  protocol                 = "tcp"
+}
+
+resource "aws_security_group_rule" "alertmanager_allow_prometheus_9093" {
+  type                     = "ingress"
+  description              = "Allow Prometheus to send alerts to Alertmanager"
+  security_group_id        = aws_security_group.alertmanager_sg.id
+  source_security_group_id = aws_security_group.prometheus_sg.id
+  from_port                = 9093
+  to_port                  = 9093
+  protocol                 = "tcp"
+}
+
+resource "aws_security_group_rule" "todo_allow_prometheus_scrape_3000" {
+  type                     = "ingress"
+  description              = "Allow Prometheus to scrape TODO API /metrics"
+  security_group_id        = aws_security_group.todo_sg.id
+  source_security_group_id = aws_security_group.prometheus_sg.id
+  from_port                = 3000
+  to_port                  = 3000
+  protocol                 = "tcp"
+}
+
+############################################
 # TASK DEFINITIONS
 ############################################
 

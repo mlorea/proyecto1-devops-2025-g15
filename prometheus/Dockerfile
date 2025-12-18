@@ -1,4 +1,3 @@
-FROM prom/prometheus:latest
+FROM prom/prometheus:v2.55.0
 COPY prometheus.yml /etc/prometheus/prometheus.yml
 COPY alerts.yml /etc/prometheus/alerts.yml
-CMD ["--config.file=/etc/prometheus/prometheus.yml","--storage.tsdb.path=/prometheus"]
