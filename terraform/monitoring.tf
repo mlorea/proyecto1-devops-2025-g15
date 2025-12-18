@@ -1,30 +1,4 @@
 ############################################
-# VARIABLES (imágenes + acceso UI)
-############################################
-
-variable "prometheus_image" {
-  type        = string
-  description = "Image for Prometheus"
-}
-
-variable "alertmanager_image" {
-  type        = string
-  description = "Image for Alertmanager"
-}
-
-variable "grafana_image" {
-  type        = string
-  description = "Image for Grafana"
-}
-
-# Para lab: podés dejar 0.0.0.0/0, pero ideal es tu IP pública /32
-variable "ui_allowed_cidr" {
-  type        = string
-  description = "CIDR allowed to access Grafana/Prometheus/Alertmanager UIs"
-  default     = "0.0.0.0/0"
-}
-
-############################################
 # CLOUD MAP (namespace interno)
 ############################################
 
@@ -152,43 +126,6 @@ resource "aws_security_group" "grafana_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
-}
-
-############################################
-# REGLAS INTERNAS (SG -> SG)
-# - Grafana -> Prometheus (queries)
-# - Prometheus -> Alertmanager (envío alertas)
-# - Prometheus -> Todo API (scrape /metrics)
-############################################
-
-resource "aws_security_group_rule" "prometheus_allow_grafana_9090" {
-  type                     = "ingress"
-  description              = "Allow Grafana to query Prometheus"
-  security_group_id        = aws_security_group.prometheus_sg.id
-  source_security_group_id = aws_security_group.grafana_sg.id
-  from_port                = 9090
-  to_port                  = 9090
-  protocol                 = "tcp"
-}
-
-resource "aws_security_group_rule" "alertmanager_allow_prometheus_9093" {
-  type                     = "ingress"
-  description              = "Allow Prometheus to send alerts to Alertmanager"
-  security_group_id        = aws_security_group.alertmanager_sg.id
-  source_security_group_id = aws_security_group.prometheus_sg.id
-  from_port                = 9093
-  to_port                  = 9093
-  protocol                 = "tcp"
-}
-
-resource "aws_security_group_rule" "todo_allow_prometheus_scrape_3000" {
-  type                     = "ingress"
-  description              = "Allow Prometheus to scrape TODO API /metrics"
-  security_group_id        = aws_security_group.todo_sg.id
-  source_security_group_id = aws_security_group.prometheus_sg.id
-  from_port                = 3000
-  to_port                  = 3000
-  protocol                 = "tcp"
 }
 
 ############################################

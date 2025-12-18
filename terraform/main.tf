@@ -11,17 +11,8 @@ terraform {
   }
 }
 
-variable "aws_region" {
-  type = string
-}
-
 provider "aws" {
-  region = var.aws_region
-}
-
-variable "image" {
-  description = "URI completa de la imagen Docker en ECR (app todo)"
-  type        = string
+  region = var.aws_region  # ← Usa la variable, pero NO la declares aquí
 }
 
 #############################
@@ -99,7 +90,7 @@ resource "aws_ecs_task_definition" "todo" {
   container_definitions = jsonencode([
     {
       name      = "todo-app"
-      image     = var.image
+      image     = var.image  # ← Usa la variable
       essential = true
       portMappings = [
         {

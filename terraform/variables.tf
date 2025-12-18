@@ -10,7 +10,6 @@ variable "image" {
   type        = string
 }
 
-# AGREGAR ESTAS 3 NUEVAS VARIABLES:
 variable "prometheus_image" {
   description = "URI completa de la imagen Docker en ECR (prometheus)"
   type        = string
@@ -24,4 +23,10 @@ variable "alertmanager_image" {
 variable "grafana_image" {
   description = "URI completa de la imagen Docker en ECR (grafana)"
   type        = string
+}
+
+variable "ui_allowed_cidr" {
+  type        = string
+  description = "CIDR allowed to access Grafana/Prometheus/Alertmanager UIs"
+  default     = "0.0.0.0/0"
 }
