@@ -100,45 +100,49 @@ jobs:
       # BUILD + PUSH (APP)
       # ---------------------------
       - name: Build & Push APP
+        id: build-app
         run: |
           APP_URI="$ECR_BASE/$ECR_REPO_APP"
           docker build -t "$ECR_REPO_APP:$IMAGE_TAG" .
           docker tag "$ECR_REPO_APP:$IMAGE_TAG" "$APP_URI:$IMAGE_TAG"
           docker push "$APP_URI:$IMAGE_TAG"
-          echo "TF_VAR_image=$APP_URI:$IMAGE_TAG" >> $GITHUB_ENV
+          echo "image=$APP_URI:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       # ---------------------------
       # BUILD + PUSH (PROMETHEUS)
       # ---------------------------
       - name: Build & Push Prometheus
+        id: build-prometheus
         run: |
           PROM_URI="$ECR_BASE/$ECR_REPO_PROM"
           docker build -f prometheus/Dockerfile -t "$ECR_REPO_PROM:$IMAGE_TAG" prometheus
           docker tag "$ECR_REPO_PROM:$IMAGE_TAG" "$PROM_URI:$IMAGE_TAG"
           docker push "$PROM_URI:$IMAGE_TAG"
-          echo "TF_VAR_prometheus_image=$PROM_URI:$IMAGE_TAG" >> $GITHUB_ENV
+          echo "prometheus_image=$PROM_URI:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       # ---------------------------
       # BUILD + PUSH (ALERTMANAGER)
       # ---------------------------
       - name: Build & Push Alertmanager
+        id: build-alertmanager
         run: |
           AM_URI="$ECR_BASE/$ECR_REPO_AM"
           docker build -f alertmanager/Dockerfile -t "$ECR_REPO_AM:$IMAGE_TAG" alertmanager
           docker tag "$ECR_REPO_AM:$IMAGE_TAG" "$AM_URI:$IMAGE_TAG"
           docker push "$AM_URI:$IMAGE_TAG"
-          echo "TF_VAR_alertmanager_image=$AM_URI:$IMAGE_TAG" >> $GITHUB_ENV
+          echo "alertmanager_image=$AM_URI:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       # ---------------------------
       # BUILD + PUSH (GRAFANA)
       # ---------------------------
       - name: Build & Push Grafana
+        id: build-grafana
         run: |
           GRAF_URI="$ECR_BASE/$ECR_REPO_GRAF"
           docker build -f grafana/Dockerfile -t "$ECR_REPO_GRAF:$IMAGE_TAG" grafana
           docker tag "$ECR_REPO_GRAF:$IMAGE_TAG" "$GRAF_URI:$IMAGE_TAG"
           docker push "$GRAF_URI:$IMAGE_TAG"
-          echo "TF_VAR_grafana_image=$GRAF_URI:$IMAGE_TAG" >> $GITHUB_ENV
+          echo "grafana_image=$GRAF_URI:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       # ---------------------------
       # INSTALAR TERRAFORM
@@ -159,8 +163,8 @@ jobs:
       - name: Terraform Apply
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-          TF_VAR_image: ${{ env.TF_VAR_image }}
-          TF_VAR_prometheus_image: ${{ env.TF_VAR_prometheus_image }}
-          TF_VAR_alertmanager_image: ${{ env.TF_VAR_alertmanager_image }}
-          TF_VAR_grafana_image: ${{ env.TF_VAR_grafana_image }}
+          TF_VAR_image: ${{ steps.build-app.outputs.image }}
+          TF_VAR_prometheus_image: ${{ steps.build-prometheus.outputs.prometheus_image }}
+          TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
+          TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
         run: terraform -chdir=terraform apply -auto-approve

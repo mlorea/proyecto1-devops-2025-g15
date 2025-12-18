@@ -5,19 +5,16 @@
 variable "prometheus_image" {
   type        = string
   description = "Image for Prometheus"
-  default     = "prom/prometheus:v2.55.0"
 }
 
 variable "alertmanager_image" {
   type        = string
   description = "Image for Alertmanager"
-  default     = "prom/alertmanager:v0.27.0"
 }
 
 variable "grafana_image" {
   type        = string
   description = "Image for Grafana"
-  default     = "grafana/grafana:11.2.0"
 }
 
 # Para lab: podés dejar 0.0.0.0/0, pero ideal es tu IP pública /32
