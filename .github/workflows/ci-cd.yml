@@ -154,12 +154,15 @@ jobs:
           terraform_version: 1.8.5
 
       # ---------------------------
-      # TERRAFORM INIT/PLAN/APPLY
+      # TERRAFORM DESTROY/APPLY
       # ---------------------------
+      - name: Terraform Destroy (limpiar infra existente)
+        run: terraform -chdir=terraform destroy -auto-approve || true
+      
       - name: Terraform Init
         run: terraform -chdir=terraform init
-
-      - name: Terraform Plan (Preview)
+      
+      - name: Terraform Apply
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
           TF_VAR_image: ${{ steps.build-app.outputs.image }}
@@ -167,20 +170,7 @@ jobs:
           TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
           TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
         run: |
-          terraform -chdir=terraform plan \
-            -replace="aws_ecs_task_definition.todo" \
-            -out=tfplan
-
-      - name: Terraform Apply (Siempre reemplaza)
-        env:
-          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-          TF_VAR_image: ${{ steps.build-app.outputs.image }}
-          TF_VAR_prometheus_image: ${{ steps.build-prometheus.outputs.prometheus_image }}
-          TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
-          TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
-        run: |
-          echo "🚀 Aplicando cambios en AWS..."
-          terraform -chdir=terraform apply -auto-approve tfplan
+          terraform -chdir=terraform apply -auto-approve -replace="aws_ecs_task_definition.todo"
 
       # ---------------------------
       # VERIFICACIÓN Y OUTPUTS
