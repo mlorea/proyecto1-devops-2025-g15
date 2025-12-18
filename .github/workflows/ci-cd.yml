@@ -160,11 +160,68 @@ jobs:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
         run: terraform -chdir=terraform init
 
-      - name: Terraform Apply
+      - name: Terraform Plan
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
           TF_VAR_image: ${{ steps.build-app.outputs.image }}
           TF_VAR_prometheus_image: ${{ steps.build-prometheus.outputs.prometheus_image }}
           TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
           TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
-        run: terraform -chdir=terraform apply -auto-approve
+        run: |
+          terraform -chdir=terraform plan -out=tfplan -detailed-exitcode || true
+
+      - name: Terraform Apply con Reemplazo Forzado
+        env:
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_image: ${{ steps.build-app.outputs.image }}
+          TF_VAR_prometheus_image: ${{ steps.build-prometheus.outputs.prometheus_image }}
+          TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
+          TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
+        run: |
+          # Primero ejecutamos un apply normal
+          echo "Ejecutando Terraform Apply normal..."
+          terraform -chdir=terraform apply -auto-approve tfplan 2>&1 | tee apply.log
+          
+          # Verificamos si hay recursos que necesitan ser reemplazados
+          if grep -q "forces replacement" apply.log; then
+            echo "Se detectaron recursos que requieren reemplazo forzado"
+            echo "Extrayendo recursos que necesitan reemplazo..."
+            
+            # Extraer los recursos que necesitan reemplazo
+            grep "forces replacement" apply.log | sed 's/.*# //' | sed 's/ .*//' | sort -u > replace_resources.txt
+            
+            if [ -s replace_resources.txt ]; then
+              echo "Recursos a reemplazar:"
+              cat replace_resources.txt
+              
+              # Construir comando de reemplazo
+              REPLACE_CMD="terraform -chdir=terraform apply -auto-approve"
+              while read -r resource; do
+                REPLACE_CMD="$REPLACE_CMD -replace=\"$resource\""
+              done < replace_resources.txt
+              
+              echo "Ejecutando reemplazo forzado..."
+              eval $REPLACE_CMD
+              
+              # Limpiar archivos temporales
+              rm -f replace_resources.txt apply.log
+            else
+              echo "No se encontraron recursos específicos para reemplazar"
+            fi
+          else
+            echo "No se detectaron recursos que requieran reemplazo forzado"
+          fi
+
+      # ---------------------------
+      # VERIFICACIÓN FINAL
+      # ---------------------------
+      - name: Verificar estado de Terraform
+        env:
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+          TF_VAR_image: ${{ steps.build-app.outputs.image }}
+          TF_VAR_prometheus_image: ${{ steps.build-prometheus.outputs.prometheus_image }}
+          TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
+          TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
+        run: |
+          echo "Estado final de la infraestructura:"
+          terraform -chdir=terraform show
