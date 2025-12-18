@@ -17,15 +17,10 @@ variable "grafana_image" {
   description = "ECR image URI for Grafana"
 }
 
-variable "frontend_image" {
-  type        = string
-  description = "ECR image URI for Frontend (nginx + vite build)"
-}
-
 # Para lab: podés dejar 0.0.0.0/0, pero ideal es tu IP pública /32
 variable "ui_allowed_cidr" {
   type        = string
-  description = "CIDR allowed to access Grafana/Prometheus/Alertmanager/Frontend UIs"
+  description = "CIDR allowed to access Grafana/Prometheus/Alertmanager UIs"
   default     = "0.0.0.0/0"
 }
 
@@ -159,26 +154,6 @@ resource "aws_security_group" "grafana_sg" {
   }
 }
 
-resource "aws_security_group" "frontend_sg" {
-  name        = "frontend-ui-sg"
-  description = "Allow access to Frontend UI (HTTP 80)"
-  vpc_id      = data.aws_vpc.default.id
-
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [var.ui_allowed_cidr]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
 ############################################
 # TASK DEFINITIONS
 ############################################
@@ -252,29 +227,6 @@ resource "aws_ecs_task_definition" "grafana" {
   ])
 }
 
-resource "aws_ecs_task_definition" "frontend" {
-  family                   = "proyecto1-frontend"
-  requires_compatibilities = ["FARGATE"]
-  network_mode             = "awsvpc"
-  cpu                      = "256"
-  memory                   = "512"
-  execution_role_arn       = aws_iam_role.task_execution.arn
-
-  container_definitions = jsonencode([
-    {
-      name      = "frontend"
-      image     = var.frontend_image
-      essential = true
-      portMappings = [
-        {
-          containerPort = 80
-          protocol      = "tcp"
-        }
-      ]
-    }
-  ])
-}
-
 ############################################
 # ECS SERVICES (con IP pública)
 ############################################
@@ -329,20 +281,6 @@ resource "aws_ecs_service" "grafana" {
   }
 }
 
-resource "aws_ecs_service" "frontend" {
-  name            = "proyecto1-frontend"
-  cluster         = aws_ecs_cluster.this.id
-  task_definition = aws_ecs_task_definition.frontend.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets          = data.aws_subnets.default.ids
-    security_groups  = [aws_security_group.frontend_sg.id]
-    assign_public_ip = true
-  }
-}
-
 ############################################
 # OUTPUTS
 ############################################
@@ -352,6 +290,5 @@ output "monitoring_service_names" {
     prometheus   = aws_ecs_service.prometheus.name
     alertmanager = aws_ecs_service.alertmanager.name
     grafana      = aws_ecs_service.grafana.name
-    frontend     = aws_ecs_service.frontend.name
   }
 }
