@@ -71,7 +71,12 @@ jobs:
           echo "AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}" >> $GITHUB_ENV
           echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
           echo "ECR_BASE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
+
+          # Nombres de repos ECR (uno por imagen)
           echo "ECR_REPO_APP=proyecto1-todo-api" >> $GITHUB_ENV
+          echo "ECR_REPO_PROM=proyecto1-prometheus" >> $GITHUB_ENV
+          echo "ECR_REPO_AM=proyecto1-alertmanager" >> $GITHUB_ENV
+          echo "ECR_REPO_GRAF=proyecto1-grafana" >> $GITHUB_ENV
 
       # ---------------------------
       # LOGIN A ECR
@@ -82,12 +87,14 @@ jobs:
             | docker login --username AWS --password-stdin "$ECR_BASE"
 
       # ---------------------------
-      # CREAR REPO ECR (APP) SI NO EXISTE
+      # CREAR REPOS ECR SI NO EXISTEN
       # ---------------------------
-      - name: Create ECR repo (APP) if not exist
+      - name: Create ECR repos if not exist
         run: |
-          aws ecr describe-repositories --repository-names "$ECR_REPO_APP" >/dev/null 2>&1 \
-            || aws ecr create-repository --repository-name "$ECR_REPO_APP" >/dev/null
+          for repo in "$ECR_REPO_APP" "$ECR_REPO_PROM" "$ECR_REPO_AM" "$ECR_REPO_GRAF"; do
+            aws ecr describe-repositories --repository-names "$repo" >/dev/null 2>&1 \
+              || aws ecr create-repository --repository-name "$repo" >/dev/null
+          done
 
       # ---------------------------
       # BUILD + PUSH (APP)
@@ -146,18 +153,12 @@ jobs:
           terraform_version: 1.8.5
 
       # ---------------------------
-      # TERRAFORM INIT / PLAN / APPLY (no interactivo)
+      # TERRAFORM INIT/APPLY
       # ---------------------------
       - name: Terraform Init
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
         run: terraform -chdir=terraform init
-
-      - name: Terraform Plan
-        env:
-          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-          TF_VAR_image: ${{ env.TF_VAR_image }}
-        run: terraform -chdir=terraform plan -input=false -out=tfplan
 
       - name: Terraform Apply
         env:
