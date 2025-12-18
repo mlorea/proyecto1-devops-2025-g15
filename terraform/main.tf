@@ -51,7 +51,7 @@ resource "aws_security_group" "todo_sg" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  # Puerto de Grafana (cambia si usas otro)
+  # Puerto de Grafana
   ingress {
     from_port   = 3001
     to_port     = 3001
@@ -107,8 +107,8 @@ resource "aws_ecs_task_definition" "todo" {
   family                   = "proyecto1-todo-task"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = "1024"  # Aumentado para todos los containers
-  memory                   = "2048"  # Aumentado para todos los containers
+  cpu                      = "1024"
+  memory                   = "2048"
 
   execution_role_arn = aws_iam_role.task_execution.arn
 
@@ -196,7 +196,7 @@ resource "aws_ecs_task_definition" "todo" {
       essential = true
       portMappings = [
         {
-          containerPort = 3001  # Puerto interno de Grafana
+          containerPort = 3001
           protocol      = "tcp"
         }
       ]
@@ -263,18 +263,23 @@ resource "aws_cloudwatch_log_group" "grafana" {
   retention_in_days = 7
 }
 
+# Outputs útiles y seguros
 output "ecs_service_name" {
-  value = aws_ecs_service.todo.name
+  description = "Nombre del servicio ECS"
+  value       = aws_ecs_service.todo.name
 }
 
-output "app_url" {
-  value = "http://${aws_ecs_service.todo.load_balancer[0].dns_name}:3000"
+output "ecs_cluster_name" {
+  description = "Nombre del cluster ECS"
+  value       = aws_ecs_cluster.this.name
 }
 
-output "prometheus_url" {
-  value = "http://${aws_ecs_service.todo.load_balancer[0].dns_name}:9090"
-}
-
-output "grafana_url" {
-  value = "http://${aws_ecs_service.todo.load_balancer[0].dns_name}:3001"
+output "cloudwatch_log_groups" {
+  description = "Grupos de logs de CloudWatch para monitoreo"
+  value = {
+    app         = aws_cloudwatch_log_group.todo_app.name
+    prometheus  = aws_cloudwatch_log_group.prometheus.name
+    alertmanager = aws_cloudwatch_log_group.alertmanager.name
+    grafana     = aws_cloudwatch_log_group.grafana.name
+  }
 }
