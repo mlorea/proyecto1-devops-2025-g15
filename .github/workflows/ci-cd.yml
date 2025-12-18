@@ -21,6 +21,9 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Instalar prom-client (PARA MÉTRICAS)
+        run: npm install prom-client
+
       - name: Instalar dependencias (API)
         run: npm install
 
@@ -69,11 +72,9 @@ jobs:
         run: |
           echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}" >> $GITHUB_ENV
-          # Tag único: fecha + commit short SHA
           echo "IMAGE_TAG=$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
           echo "ECR_BASE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
 
-          # Nombres de repos ECR (uno por imagen)
           echo "ECR_REPO_APP=proyecto1-todo-api" >> $GITHUB_ENV
           echo "ECR_REPO_PROM=proyecto1-prometheus" >> $GITHUB_ENV
           echo "ECR_REPO_AM=proyecto1-alertmanager" >> $GITHUB_ENV
@@ -154,23 +155,31 @@ jobs:
           terraform_version: 1.8.5
 
       # ---------------------------
-      # TERRAFORM DESTROY/APPLY
+      # LIMPIAR Y DESPLEGAR
       # ---------------------------
+      - name: Limpiar archivos Terraform problemáticos
+        run: |
+          cd terraform
+          echo "📁 Eliminando archivos problemáticos..."
+          # Eliminar cualquier archivo que no sea main.tf o variables.tf
+          find . -name "*.tf" ! -name "main.tf" ! -name "variables.tf" -type f -delete
+          echo "✅ Archivos restantes:"
+          ls -la *.tf
+
       - name: Terraform Init
         run: terraform -chdir=terraform init
-      
-      - name: Terraform Destroy (forzado)
+
+      - name: Terraform Destroy (limpiar todo)
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-          # Añade valores dummy para las imágenes (pueden ser cualquier cosa)
           TF_VAR_image: dummy
           TF_VAR_prometheus_image: dummy
           TF_VAR_alertmanager_image: dummy
           TF_VAR_grafana_image: dummy
         run: |
-          echo "🚨 DESTRUYENDO infraestructura existente..."
-          terraform -chdir=terraform destroy -auto-approve
-      
+          echo "🚨 DESTRUYENDO infraestructura anterior..."
+          terraform -chdir=terraform destroy -auto-approve || echo "⚠️  No había infra para destruir"
+
       - name: Terraform Apply
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
@@ -180,13 +189,4 @@ jobs:
           TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
         run: |
           echo "🚀 CREANDO nueva infraestructura..."
-          terraform -chdir=terraform apply -auto-approve -replace="aws_ecs_task_definition.todo"
-
-      # ---------------------------
-      # VERIFICACIÓN Y OUTPUTS
-      # ---------------------------
-      - name: Mostrar URLs de despliegue
-        run: |
-          echo "✅ Despliegue completado"
-          echo "📊 Para ver los outputs:"
-          echo "terraform -chdir=terraform output"
+          terraform -chdir=terraform apply -auto-approve
