@@ -140,7 +140,7 @@ resource "aws_ecs_task_definition" "todo" {
         }
       }
     },
-    
+
     # Container 2: Prometheus
     {
       name      = "prometheus"
@@ -167,7 +167,7 @@ resource "aws_ecs_task_definition" "todo" {
         }
       }
     },
-    
+
     # Container 3: Alertmanager
     {
       name      = "alertmanager"
@@ -188,7 +188,7 @@ resource "aws_ecs_task_definition" "todo" {
         }
       }
     },
-    
+
     # Container 4: Grafana
     {
       name      = "grafana"
@@ -222,7 +222,7 @@ resource "aws_ecs_task_definition" "todo" {
   ])
 }
 
-# IMPORTANTE: se registra en Cloud Map (definido en monitoring.tf)
+# Servicio ECS (Cloud Map deshabilitado para evitar referencia inexistente)
 resource "aws_ecs_service" "todo" {
   name            = "proyecto1-todo-service"
   cluster         = aws_ecs_cluster.this.id
@@ -230,10 +230,10 @@ resource "aws_ecs_service" "todo" {
   desired_count   = 1
   launch_type     = "FARGATE"
 
-  # Registro DNS interno: todo.internal
-  service_registries {
-    registry_arn = aws_service_discovery_service.todo.arn
-  }
+  # 👉 DESHABILITAR CLOUD MAP:
+  # service_registries {
+  #   registry_arn = aws_service_discovery_service.todo.arn
+  # }
 
   network_configuration {
     subnets          = data.aws_subnets.default.ids
@@ -277,9 +277,9 @@ output "ecs_cluster_name" {
 output "cloudwatch_log_groups" {
   description = "Grupos de logs de CloudWatch para monitoreo"
   value = {
-    app         = aws_cloudwatch_log_group.todo_app.name
-    prometheus  = aws_cloudwatch_log_group.prometheus.name
+    app          = aws_cloudwatch_log_group.todo_app.name
+    prometheus   = aws_cloudwatch_log_group.prometheus.name
     alertmanager = aws_cloudwatch_log_group.alertmanager.name
-    grafana     = aws_cloudwatch_log_group.grafana.name
+    grafana      = aws_cloudwatch_log_group.grafana.name
   }
 }

@@ -155,7 +155,7 @@ jobs:
           terraform_version: 1.8.5
 
       # ---------------------------
-      # LIMPIAR Y DESPLEGAR
+      # (OPCIONAL) LIMPIEZA de .tf
       # ---------------------------
       - name: Limpiar archivos Terraform problemáticos
         run: |
@@ -180,7 +180,7 @@ jobs:
           echo "🚨 DESTRUYENDO infraestructura anterior..."
           terraform -chdir=terraform destroy -auto-approve || echo "⚠️  No había infra para destruir"
 
-      - name: Terraform Apply
+      - name: Terraform Apply (recrear ECS cada corrida)
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
           TF_VAR_image: ${{ steps.build-app.outputs.image }}
@@ -189,4 +189,6 @@ jobs:
           TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
         run: |
           echo "🚀 CREANDO nueva infraestructura..."
-          terraform -chdir=terraform apply -auto-approve
+          terraform -chdir=terraform apply -auto-approve \
+            -replace=aws_ecs_task_definition.todo \
+            -replace=aws_ecs_service.todo
