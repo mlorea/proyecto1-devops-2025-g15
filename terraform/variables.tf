@@ -2,7 +2,9 @@
 # Se inyectan desde GitHub Actions como TF_VAR_*.
 
 variable "aws_region" {
-  type = string
+  description = "Región de AWS donde se desplegarán los recursos"
+  type        = string
+  default     = "us-east-1"
 }
 
 variable "image" {
@@ -26,7 +28,7 @@ variable "grafana_image" {
 }
 
 variable "ui_allowed_cidr" {
-  type        = string
   description = "CIDR allowed to access Grafana/Prometheus/Alertmanager UIs"
+  type        = string
   default     = "0.0.0.0/0"
 }

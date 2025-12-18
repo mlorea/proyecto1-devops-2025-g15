@@ -12,7 +12,7 @@ terraform {
 }
 
 provider "aws" {
-  region = var.aws_region  # ← Usa la variable, pero NO la declares aquí
+  region = var.aws_region
 }
 
 #############################
@@ -32,12 +32,37 @@ data "aws_subnets" "default" {
 
 resource "aws_security_group" "todo_sg" {
   name        = "todo-app-sg"
-  description = "Allow HTTP to todo app"
+  description = "Allow HTTP to todo app and monitoring"
   vpc_id      = data.aws_vpc.default.id
 
+  # Puerto de la app
   ingress {
     from_port   = 3000
     to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Puerto de Prometheus
+  ingress {
+    from_port   = 9090
+    to_port     = 9090
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Puerto de Grafana (cambia si usas otro)
+  ingress {
+    from_port   = 3001
+    to_port     = 3001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  # Puerto de Alertmanager
+  ingress {
+    from_port   = 9093
+    to_port     = 9093
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -82,15 +107,16 @@ resource "aws_ecs_task_definition" "todo" {
   family                   = "proyecto1-todo-task"
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
-  cpu                      = "256"
-  memory                   = "512"
+  cpu                      = "1024"  # Aumentado para todos los containers
+  memory                   = "2048"  # Aumentado para todos los containers
 
   execution_role_arn = aws_iam_role.task_execution.arn
 
   container_definitions = jsonencode([
+    # Container 1: Tu App
     {
       name      = "todo-app"
-      image     = var.image  # ← Usa la variable
+      image     = var.image
       essential = true
       portMappings = [
         {
@@ -98,6 +124,100 @@ resource "aws_ecs_task_definition" "todo" {
           protocol      = "tcp"
         }
       ]
+      healthCheck = {
+        command     = ["CMD-SHELL", "curl -f http://localhost:3000/health || exit 1"]
+        interval    = 30
+        timeout     = 5
+        retries     = 3
+        startPeriod = 60
+      }
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/proyecto1-todo"
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    },
+    
+    # Container 2: Prometheus
+    {
+      name      = "prometheus"
+      image     = var.prometheus_image
+      essential = true
+      portMappings = [
+        {
+          containerPort = 9090
+          protocol      = "tcp"
+        }
+      ]
+      dependsOn = [
+        {
+          containerName = "todo-app"
+          condition     = "HEALTHY"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/proyecto1-prometheus"
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    },
+    
+    # Container 3: Alertmanager
+    {
+      name      = "alertmanager"
+      image     = var.alertmanager_image
+      essential = true
+      portMappings = [
+        {
+          containerPort = 9093
+          protocol      = "tcp"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/proyecto1-alertmanager"
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
+    },
+    
+    # Container 4: Grafana
+    {
+      name      = "grafana"
+      image     = var.grafana_image
+      essential = true
+      portMappings = [
+        {
+          containerPort = 3001  # Puerto interno de Grafana
+          protocol      = "tcp"
+        }
+      ]
+      environment = [
+        {
+          name  = "GF_SERVER_HTTP_PORT"
+          value = "3001"
+        },
+        {
+          name  = "GF_SECURITY_ADMIN_PASSWORD"
+          value = "admin"
+        }
+      ]
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = "/ecs/proyecto1-grafana"
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "ecs"
+        }
+      }
     }
   ])
 }
@@ -122,6 +242,39 @@ resource "aws_ecs_service" "todo" {
   }
 }
 
+# CloudWatch Log Groups
+resource "aws_cloudwatch_log_group" "todo_app" {
+  name              = "/ecs/proyecto1-todo"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "prometheus" {
+  name              = "/ecs/proyecto1-prometheus"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "alertmanager" {
+  name              = "/ecs/proyecto1-alertmanager"
+  retention_in_days = 7
+}
+
+resource "aws_cloudwatch_log_group" "grafana" {
+  name              = "/ecs/proyecto1-grafana"
+  retention_in_days = 7
+}
+
 output "ecs_service_name" {
   value = aws_ecs_service.todo.name
+}
+
+output "app_url" {
+  value = "http://${aws_ecs_service.todo.load_balancer[0].dns_name}:3000"
+}
+
+output "prometheus_url" {
+  value = "http://${aws_ecs_service.todo.load_balancer[0].dns_name}:9090"
+}
+
+output "grafana_url" {
+  value = "http://${aws_ecs_service.todo.load_balancer[0].dns_name}:3001"
 }
