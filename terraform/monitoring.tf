@@ -202,7 +202,7 @@ resource "aws_ecs_task_definition" "grafana" {
 }
 
 ############################################
-# ECS SERVICES (con IP pública)
+# ECS SERVICES (con IP pública y execute command)
 ############################################
 
 resource "aws_ecs_service" "prometheus" {
@@ -211,6 +211,9 @@ resource "aws_ecs_service" "prometheus" {
   task_definition = aws_ecs_task_definition.prometheus.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+  
+  # 🔧 HABILITA COMANDOS DE EJECUCIÓN (LÍNEA AGREGADA)
+  enable_execute_command = true
 
   service_registries {
     registry_arn = aws_service_discovery_service.prometheus.arn
@@ -229,6 +232,9 @@ resource "aws_ecs_service" "alertmanager" {
   task_definition = aws_ecs_task_definition.alertmanager.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+  
+  # 🔧 HABILITA COMANDOS DE EJECUCIÓN (LÍNEA AGREGADA)
+  enable_execute_command = true
 
   service_registries {
     registry_arn = aws_service_discovery_service.alertmanager.arn
@@ -247,6 +253,9 @@ resource "aws_ecs_service" "grafana" {
   task_definition = aws_ecs_task_definition.grafana.arn
   desired_count   = 1
   launch_type     = "FARGATE"
+  
+  # 🔧 HABILITA COMANDOS DE EJECUCIÓN (LÍNEA AGREGADA)
+  enable_execute_command = true
 
   network_configuration {
     subnets          = data.aws_subnets.default.ids
