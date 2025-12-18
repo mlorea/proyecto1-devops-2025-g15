@@ -2,3 +2,26 @@ node_modules/
 data/
 .env
 sbom.json
+# Terraform
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+crash.log
+crash.*.log
+.override.tf
+.override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Local-only plan files
+tfplan
+*.plan
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+ive
