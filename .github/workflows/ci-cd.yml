@@ -69,7 +69,8 @@ jobs:
         run: |
           echo "AWS_REGION=${{ secrets.AWS_REGION }}" >> $GITHUB_ENV
           echo "AWS_ACCOUNT_ID=${{ secrets.AWS_ACCOUNT_ID }}" >> $GITHUB_ENV
-          echo "IMAGE_TAG=${{ github.sha }}" >> $GITHUB_ENV
+          # Tag único: fecha + commit short SHA
+          echo "IMAGE_TAG=$(date +%Y%m%d-%H%M%S)-${GITHUB_SHA:0:8}" >> $GITHUB_ENV
           echo "ECR_BASE=${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com" >> $GITHUB_ENV
 
           # Nombres de repos ECR (uno por imagen)
@@ -153,14 +154,12 @@ jobs:
           terraform_version: 1.8.5
 
       # ---------------------------
-      # TERRAFORM INIT/APPLY
+      # TERRAFORM INIT/PLAN/APPLY
       # ---------------------------
       - name: Terraform Init
-        env:
-          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
         run: terraform -chdir=terraform init
 
-      - name: Terraform Plan
+      - name: Terraform Plan (Preview)
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
           TF_VAR_image: ${{ steps.build-app.outputs.image }}
@@ -168,9 +167,11 @@ jobs:
           TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
           TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
         run: |
-          terraform -chdir=terraform plan -out=tfplan -detailed-exitcode || true
+          terraform -chdir=terraform plan \
+            -replace="aws_ecs_task_definition.todo" \
+            -out=tfplan
 
-      - name: Terraform Apply con Reemplazo Forzado
+      - name: Terraform Apply (Siempre reemplaza)
         env:
           TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
           TF_VAR_image: ${{ steps.build-app.outputs.image }}
@@ -178,50 +179,14 @@ jobs:
           TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
           TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
         run: |
-          # Primero ejecutamos un apply normal
-          echo "Ejecutando Terraform Apply normal..."
-          terraform -chdir=terraform apply -auto-approve tfplan 2>&1 | tee apply.log
-          
-          # Verificamos si hay recursos que necesitan ser reemplazados
-          if grep -q "forces replacement" apply.log; then
-            echo "Se detectaron recursos que requieren reemplazo forzado"
-            echo "Extrayendo recursos que necesitan reemplazo..."
-            
-            # Extraer los recursos que necesitan reemplazo
-            grep "forces replacement" apply.log | sed 's/.*# //' | sed 's/ .*//' | sort -u > replace_resources.txt
-            
-            if [ -s replace_resources.txt ]; then
-              echo "Recursos a reemplazar:"
-              cat replace_resources.txt
-              
-              # Construir comando de reemplazo
-              REPLACE_CMD="terraform -chdir=terraform apply -auto-approve"
-              while read -r resource; do
-                REPLACE_CMD="$REPLACE_CMD -replace=\"$resource\""
-              done < replace_resources.txt
-              
-              echo "Ejecutando reemplazo forzado..."
-              eval $REPLACE_CMD
-              
-              # Limpiar archivos temporales
-              rm -f replace_resources.txt apply.log
-            else
-              echo "No se encontraron recursos específicos para reemplazar"
-            fi
-          else
-            echo "No se detectaron recursos que requieran reemplazo forzado"
-          fi
+          echo "🚀 Aplicando cambios en AWS..."
+          terraform -chdir=terraform apply -auto-approve tfplan
 
       # ---------------------------
-      # VERIFICACIÓN FINAL
+      # VERIFICACIÓN Y OUTPUTS
       # ---------------------------
-      - name: Verificar estado de Terraform
-        env:
-          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-          TF_VAR_image: ${{ steps.build-app.outputs.image }}
-          TF_VAR_prometheus_image: ${{ steps.build-prometheus.outputs.prometheus_image }}
-          TF_VAR_alertmanager_image: ${{ steps.build-alertmanager.outputs.alertmanager_image }}
-          TF_VAR_grafana_image: ${{ steps.build-grafana.outputs.grafana_image }}
+      - name: Mostrar URLs de despliegue
         run: |
-          echo "Estado final de la infraestructura:"
-          terraform -chdir=terraform show
+          echo "✅ Despliegue completado"
+          echo "📊 Para ver los outputs:"
+          echo "terraform -chdir=terraform output"
