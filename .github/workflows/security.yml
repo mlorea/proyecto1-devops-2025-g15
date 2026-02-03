@@ -1,18 +1,13 @@
 name: Security Pipeline
 
 on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-  schedule:
-    - cron: '0 2 * * *'
+  workflow_dispatch:
 
 jobs:
   security-scan:
     name: Security Scanning
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -121,8 +116,7 @@ jobs:
   sonarqube:
     name: SonarQube Analysis
     runs-on: ubuntu-latest
-    if: github.event_name == 'push'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
